@@ -68,25 +68,6 @@ ARG REGISTRY_VERSION=v2.3.0
 # is skipped on that architecture.
 ARG REGISTRY_VERSION_SCHEMA1=v2.1.0
 ARG TARGETPLATFORM
-RUN --mount=from=registry-src,src=/usr/src/registry,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=registry-build-$TARGETPLATFORM \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=tmpfs,target=/go/src <<EOT
-  set -ex
-  git fetch -q --depth 1 origin "${REGISTRY_VERSION}" +refs/tags/*:refs/tags/*
-  git checkout -q FETCH_HEAD
-  export GOPATH="/go/src/github.com/docker/distribution/Godeps/_workspace:$GOPATH"
-  CGO_ENABLED=0 xx-go build -o /build/registry-v2 -v ./cmd/registry
-  xx-verify /build/registry-v2
-  case $TARGETPLATFORM in
-    linux/amd64|linux/arm/v7|linux/ppc64le|linux/s390x)
-      git fetch -q --depth 1 origin "${REGISTRY_VERSION_SCHEMA1}" +refs/tags/*:refs/tags/*
-      git checkout -q FETCH_HEAD
-      CGO_ENABLED=0 xx-go build -o /build/registry-v2-schema1 -v ./cmd/registry
-      xx-verify /build/registry-v2-schema1
-      ;;
-  esac
-EOT
 
 # go-swagger
 FROM base AS swagger-src
@@ -102,15 +83,6 @@ RUN git fetch -q --depth 1 origin "${GO_SWAGGER_COMMIT}" && git checkout -q FETC
 FROM base AS swagger
 WORKDIR /go/src/github.com/go-swagger/go-swagger
 ARG TARGETPLATFORM
-RUN --mount=from=swagger-src,src=/usr/src/swagger,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=swagger-build-$TARGETPLATFORM \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=tmpfs,target=/go/src/ <<EOT
-  set -e
-  xx-go build -o /build/swagger ./cmd/swagger
-  xx-verify /build/swagger
-EOT
-
 # frozen-images
 # See also frozenImages in "testutil/environment/protect.go" (which needs to
 # be updated when adding images to this list)
@@ -147,13 +119,7 @@ RUN git fetch -q --depth 1 origin "${DELVE_VERSION}" +refs/tags/*:refs/tags/* &&
 FROM base AS delve-build
 WORKDIR /usr/src/delve
 ARG TARGETPLATFORM
-RUN --mount=from=delve-src,src=/usr/src/delve,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=delve-build-$TARGETPLATFORM \
-    --mount=type=cache,target=/go/pkg/mod <<EOT
-  set -e
-  GO111MODULE=on xx-go build -o /build/dlv ./cmd/dlv
-  xx-verify /build/dlv
-EOT
+
 
 # delve is currently only supported on linux/amd64 and linux/arm64;
 # https://github.com/go-delve/delve/blob/v1.8.1/pkg/proc/native/support_sentinel.go#L1-L6
@@ -210,19 +176,7 @@ RUN --mount=type=cache,sharing=locked,id=moby-containerd-aptlib,target=/var/lib/
         apt-get update && xx-apt-get install -y --no-install-recommends \
             gcc libbtrfs-dev libsecret-1-dev
 ARG DOCKER_STATIC
-RUN --mount=from=containerd-src,src=/usr/src/containerd,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=containerd-build-$TARGETPLATFORM <<EOT
-  set -e
-  export CC=$(xx-info)-gcc
-  export CGO_ENABLED=$([ "$DOCKER_STATIC" = "1" ] && echo "0" || echo "1")
-  xx-go --wrap
-  make $([ "$DOCKER_STATIC" = "1" ] && echo "STATIC=1") binaries
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") bin/containerd
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") bin/containerd-shim-runc-v2
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") bin/ctr
-  mkdir /build
-  mv bin/containerd bin/containerd-shim-runc-v2 bin/ctr /build
-EOT
+
 
 FROM containerd-build AS containerd-linux
 FROM binary-dummy AS containerd-windows
@@ -293,15 +247,7 @@ RUN --mount=type=cache,sharing=locked,id=moby-runc-aptlib,target=/var/lib/apt \
         apt-get update && xx-apt-get install -y --no-install-recommends \
             dpkg-dev gcc libc6-dev libseccomp-dev
 ARG DOCKER_STATIC
-RUN --mount=from=runc-src,src=/usr/src/runc,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=runc-build-$TARGETPLATFORM <<EOT
-  set -e
-  xx-go --wrap
-  CGO_ENABLED=1 make "$([ "$DOCKER_STATIC" = "1" ] && echo "static" || echo "runc")"
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") runc
-  mkdir /build
-  mv runc /build/
-EOT
+
 
 FROM runc-build AS runc-linux
 FROM binary-dummy AS runc-windows
@@ -327,16 +273,7 @@ RUN --mount=type=cache,sharing=locked,id=moby-tini-aptlib,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,id=moby-tini-aptcache,target=/var/cache/apt \
         xx-apt-get install -y --no-install-recommends \
             gcc libc6-dev
-RUN --mount=from=tini-src,src=/usr/src/tini,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=tini-build-$TARGETPLATFORM <<EOT
-  set -e
-  CC=$(xx-info)-gcc cmake .
-  make tini-static
-  xx-verify --static tini-static
-  mkdir /build
-  mv tini-static /build/docker-init
-EOT
-
+            
 FROM tini-build AS tini-linux
 FROM binary-dummy AS tini-windows
 FROM tini-${TARGETOS} AS tini
@@ -359,16 +296,7 @@ RUN --mount=type=cache,sharing=locked,id=moby-rootlesskit-aptlib,target=/var/lib
             gcc libc6-dev
 ENV GO111MODULE=on
 ARG DOCKER_STATIC
-RUN --mount=from=rootlesskit-src,src=/usr/src/rootlesskit,rw \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build,id=rootlesskit-build-$TARGETPLATFORM <<EOT
-  set -e
-  export CGO_ENABLED=$([ "$DOCKER_STATIC" = "1" ] && echo "0" || echo "1")
-  xx-go build -o /build/rootlesskit -ldflags="$([ "$DOCKER_STATIC" != "1" ] && echo "-linkmode=external")" ./cmd/rootlesskit
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") /build/rootlesskit
-  xx-go build -o /build/rootlesskit-docker-proxy -ldflags="$([ "$DOCKER_STATIC" != "1" ] && echo "-linkmode=external")" ./cmd/rootlesskit-docker-proxy
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") /build/rootlesskit-docker-proxy
-EOT
+
 COPY --link ./contrib/dockerd-rootless.sh /build/
 COPY --link ./contrib/dockerd-rootless-setuptool.sh /build/
 
@@ -425,14 +353,7 @@ FROM base AS containerutil-build
 WORKDIR /usr/src/containerutil
 ARG TARGETPLATFORM
 RUN xx-apt-get install -y --no-install-recommends gcc g++ libc6-dev
-RUN --mount=from=containerutil-src,src=/usr/src/containerutil,rw \
-    --mount=type=cache,target=/root/.cache/go-build,id=containerutil-build-$TARGETPLATFORM <<EOT
-  set -e
-  CC="$(xx-info)-gcc" CXX="$(xx-info)-g++" make
-  xx-verify --static containerutility.exe
-  mkdir /build
-  mv containerutility.exe /build/
-EOT
+
 
 FROM binary-dummy AS containerutil-linux
 FROM containerutil-build AS containerutil-windows-amd64
@@ -596,25 +517,7 @@ ARG PACKAGER_NAME
 # PREFIX overrides DEST dir in make.sh script otherwise it fails because of
 # read only mount in current work dir
 ENV PREFIX=/tmp
-RUN <<EOT
-  # in bullseye arm64 target does not link with lld so configure it to use ld instead
-  if [ "$(xx-info arch)" = "arm64" ]; then
-    XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple
-  fi
-EOT
-RUN --mount=type=bind,target=.,rw \
-    --mount=type=tmpfs,target=cli/winresources/dockerd \
-    --mount=type=tmpfs,target=cli/winresources/docker-proxy \
-    --mount=type=cache,target=/root/.cache/go-build,id=moby-build-$TARGETPLATFORM <<EOT
-  set -e
-  target=$([ "$DOCKER_STATIC" = "1" ] && echo "binary" || echo "dynbinary")
-  xx-go --wrap
-  PKG_CONFIG=$(xx-go env PKG_CONFIG) ./hack/make.sh $target
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") /tmp/bundles/${target}-daemon/dockerd$([ "$(xx-info os)" = "windows" ] && echo ".exe")
-  xx-verify $([ "$DOCKER_STATIC" = "1" ] && echo "--static") /tmp/bundles/${target}-daemon/docker-proxy$([ "$(xx-info os)" = "windows" ] && echo ".exe")
-  mkdir /build
-  mv /tmp/bundles/${target}-daemon/* /build/
-EOT
+
 
 # usage:
 # > docker buildx bake binary
@@ -642,13 +545,6 @@ COPY --link --from=build         /build  /
 FROM --platform=$TARGETPLATFORM base AS smoketest
 WORKDIR /usr/local/bin
 COPY --from=build /build .
-RUN <<EOT
-  set -ex
-  file dockerd
-  dockerd --version
-  file docker-proxy
-  docker-proxy --version
-EOT
 
 # usage:
 # > make shell
