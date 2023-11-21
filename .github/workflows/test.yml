@@ -40,13 +40,13 @@ jobs:
           fi
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
       -
         name: Build dev image
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@849707117b03d39aba7924c50a10376a69e88d7d # v4.1.0
         with:
           targets: dev
           set: |
@@ -80,7 +80,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       -
         name: Create matrix
         id: scripts
@@ -105,7 +105,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 0
       -
@@ -113,10 +113,10 @@ jobs:
         uses: ./.github/actions/setup-runner
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
       -
         name: Build dev image
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@849707117b03d39aba7924c50a10376a69e88d7d # v4.1.0
         with:
           targets: dev
           set: |
@@ -135,7 +135,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       -
         name: Create matrix
         id: platforms
@@ -158,7 +158,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       -
         name: Prepare
         run: |
@@ -166,13 +166,13 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
       -
         name: Test
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@849707117b03d39aba7924c50a10376a69e88d7d # v4.1.0
         with:
           targets: binary-smoketest
           set: |
