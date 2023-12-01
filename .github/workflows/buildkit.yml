@@ -27,13 +27,13 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       -
         name: Build
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@v4
         with:
           targets: binary
       -
@@ -75,7 +75,7 @@ jobs:
           echo "BUILDKIT_TEST_DISABLE_FEATURES=${disabledFeatures}" >> $GITHUB_ENV
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: moby
       -
@@ -85,17 +85,17 @@ jobs:
         working-directory: moby
       -
         name: Checkout BuildKit ${{ env.BUILDKIT_REF }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ env.BUILDKIT_REPO }}
           ref: ${{ env.BUILDKIT_REF }}
           path: buildkit
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       -
         name: Download binary artifacts
         uses: actions/download-artifact@v3
